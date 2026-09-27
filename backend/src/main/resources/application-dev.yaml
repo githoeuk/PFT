@@ -1,0 +1,52 @@
+server:
+  port: 8080
+  servlet:
+    session:
+      tracking-modes: cookie
+    encoding:
+      charset: UTF-8
+      force: true
+
+spring:
+  application:
+    name: beacon-attendance
+
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 50MB
+      max-request-size: 100MB
+
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/beacon_attendance?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:root}
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        default_batch_fetch_size: 100
+    defer-datasource-initialization: true
+
+  sql:
+    init:
+      mode: always
+      data-locations:
+        - classpath:data.sql
+
+logging:
+  level:
+    root: INFO
+    com.beaconattendance: DEBUG
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:dev-secret-key-dev-secret-key-dev-secret-key}
+    access-token-expiration-ms: 3600000
+    refresh-token-expiration-ms: 1209600000
