@@ -12,6 +12,8 @@ import type {
   NewWorker,
   Site,
   SiteStatus,
+  SiteWorkerAssignment,
+  SiteWorkerAssignmentInput,
   Worker,
 } from '@/types/erp'
 import { todayIso } from '@/utils/formatters'
@@ -22,6 +24,7 @@ const createId = (prefix: string): string =>
 export const useErpStore = defineStore('erp', () => {
   const sites = ref<Site[]>([])
   const workers = ref<Worker[]>([])
+  const siteWorkerAssignments = ref<SiteWorkerAssignment[]>([])
   const attendanceRecords = ref<AttendanceRecord[]>([])
   const hydrated = ref(false)
   const storageMode = ref<ErpRepository['kind']>('browser')
@@ -43,6 +46,7 @@ export const useErpStore = defineStore('erp', () => {
   const snapshot = () => ({
     sites: sites.value.map((site) => ({ ...site })),
     workers: workers.value.map((worker) => ({ ...worker })),
+    siteWorkerAssignments: siteWorkerAssignments.value.map((assignment) => ({ ...assignment })),
     attendanceRecords: attendanceRecords.value.map((record) => ({ ...record })),
   })
 
@@ -69,6 +73,7 @@ export const useErpStore = defineStore('erp', () => {
       const workerRoles = new Map(data.workers.map((worker) => [worker.id, worker.role]))
       sites.value = data.sites
       workers.value = data.workers
+      siteWorkerAssignments.value = data.siteWorkerAssignments
       attendanceRecords.value = data.attendanceRecords.map((record) => ({
         ...record,
         workRole: record.workRole || workerRoles.get(record.workerId) || 'painter',
@@ -119,6 +124,43 @@ export const useErpStore = defineStore('erp', () => {
     persist()
   }
 
+  function upsertSiteWorkerAssignment(input: SiteWorkerAssignmentInput): SiteWorkerAssignment {
+    const existing = siteWorkerAssignments.value.find(
+      (assignment) =>
+        assignment.siteId === input.siteId && assignment.workerId === input.workerId,
+    )
+    const now = new Date().toISOString()
+
+    if (existing) {
+      Object.assign(existing, input, { updatedAt: now })
+      persist()
+      return existing
+    }
+
+    const created: SiteWorkerAssignment = {
+      ...input,
+      id: createId('assignment'),
+      createdAt: now,
+      updatedAt: now,
+    }
+    siteWorkerAssignments.value.push(created)
+    persist()
+    return created
+  }
+
+  function removeSiteWorkerAssignment(assignmentId: string) {
+    const index = siteWorkerAssignments.value.findIndex(
+      (assignment) => assignment.id === assignmentId,
+    )
+    if (index < 0) return
+    siteWorkerAssignments.value.splice(index, 1)
+    persist()
+  }
+
+  function assignmentsForSite(siteId: string) {
+    return siteWorkerAssignments.value.filter((assignment) => assignment.siteId === siteId)
+  }
+
   function upsertAttendance(input: AttendanceInput): AttendanceRecord {
     const existing = attendanceRecords.value.find(
       (record) =>
@@ -161,6 +203,7 @@ export const useErpStore = defineStore('erp', () => {
   return {
     sites,
     workers,
+    siteWorkerAssignments,
     attendanceRecords,
     hydrated,
     storageMode,
@@ -176,6 +219,9 @@ export const useErpStore = defineStore('erp', () => {
     addWorker,
     updateWorker,
     toggleWorker,
+    upsertSiteWorkerAssignment,
+    removeSiteWorkerAssignment,
+    assignmentsForSite,
     upsertAttendance,
     attendanceFor,
     laborCostFor,

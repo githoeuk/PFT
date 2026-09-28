@@ -26,6 +26,19 @@ CREATE TABLE IF NOT EXISTS workers (
   created_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS site_worker_assignments (
+  id TEXT PRIMARY KEY NOT NULL,
+  site_id TEXT NOT NULL,
+  worker_id TEXT NOT NULL,
+  work_role TEXT NOT NULL,
+  daily_rate INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  UNIQUE(site_id, worker_id),
+  FOREIGN KEY(site_id) REFERENCES sites(id),
+  FOREIGN KEY(worker_id) REFERENCES workers(id)
+);
+
 CREATE TABLE IF NOT EXISTS attendance_records (
   id TEXT PRIMARY KEY NOT NULL,
   work_date TEXT NOT NULL,
@@ -49,4 +62,8 @@ CREATE INDEX IF NOT EXISTS idx_attendance_date_site
   ON attendance_records(work_date, site_id);
 CREATE INDEX IF NOT EXISTS idx_attendance_worker
   ON attendance_records(worker_id);
+CREATE INDEX IF NOT EXISTS idx_assignment_site
+  ON site_worker_assignments(site_id);
+CREATE INDEX IF NOT EXISTS idx_assignment_worker
+  ON site_worker_assignments(worker_id);
 `

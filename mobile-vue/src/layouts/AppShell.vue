@@ -44,13 +44,7 @@ const navigation = [
 
     <div class="workspace">
       <header class="topbar">
-        <div>
-          <strong>외벽 도장 공사 관리</strong>
-          <span>현장 ERP</span>
-        </div>
-        <span class="status-indicator" :class="{ error: store.storageError }">
-          <i></i>{{ store.storageError ? '저장 오류' : '로컬' }}
-        </span>
+        <strong class="topbar-brand">태광페인트</strong>
       </header>
 
       <main class="page-container">

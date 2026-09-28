@@ -13,6 +13,7 @@ import type {
   ErpData,
   Site,
   SiteStatus,
+  SiteWorkerAssignment,
   Worker,
   WorkerRole,
 } from '@/types/erp'
@@ -55,6 +56,16 @@ interface AttendanceRow {
   updated_at: string
 }
 
+interface SiteWorkerAssignmentRow {
+  id: string
+  site_id: string
+  worker_id: string
+  work_role: WorkerRole
+  daily_rate: number
+  created_at: string
+  updated_at: string
+}
+
 const siteInsert = `
   INSERT INTO sites
     (id, name, client, address, start_date, end_date, status, created_at)
@@ -74,6 +85,12 @@ const attendanceInsert = `
   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
+const assignmentInsert = `
+  INSERT INTO site_worker_assignments
+    (id, site_id, worker_id, work_role, daily_rate, created_at, updated_at)
+  VALUES (?, ?, ?, ?, ?, ?, ?)
+`
+
 export class CapacitorSqliteErpRepository implements ErpRepository {
   readonly kind = 'sqlite' as const
 
@@ -84,17 +101,23 @@ export class CapacitorSqliteErpRepository implements ErpRepository {
     const database = await this.getDatabase()
     const siteResult = await database.query('SELECT * FROM sites ORDER BY created_at DESC')
     const workerResult = await database.query('SELECT * FROM workers ORDER BY created_at DESC')
+    const assignmentResult = await database.query(
+      'SELECT * FROM site_worker_assignments ORDER BY created_at DESC',
+    )
     const attendanceResult = await database.query(
       'SELECT * FROM attendance_records ORDER BY work_date DESC, created_at DESC',
     )
 
     const sites = (siteResult.values ?? []).map((row) => this.toSite(row as SiteRow))
     const workers = (workerResult.values ?? []).map((row) => this.toWorker(row as WorkerRow))
+    const siteWorkerAssignments = (assignmentResult.values ?? []).map((row) =>
+      this.toAssignment(row as SiteWorkerAssignmentRow),
+    )
     const attendanceRecords = (attendanceResult.values ?? []).map((row) =>
       this.toAttendance(row as AttendanceRow),
     )
 
-    return { sites, workers, attendanceRecords }
+    return { sites, workers, siteWorkerAssignments, attendanceRecords }
   }
 
   async save(data: ErpData): Promise<void> {
@@ -103,12 +126,16 @@ export class CapacitorSqliteErpRepository implements ErpRepository {
 
     try {
       await database.execute(
-        'DELETE FROM attendance_records; DELETE FROM workers; DELETE FROM sites;',
+        'DELETE FROM attendance_records; DELETE FROM site_worker_assignments; DELETE FROM workers; DELETE FROM sites;',
         false,
       )
 
       await this.executeSet(database, data.sites.map(this.siteStatement))
       await this.executeSet(database, data.workers.map(this.workerStatement))
+      await this.executeSet(
+        database,
+        data.siteWorkerAssignments.map(this.assignmentStatement),
+      )
       await this.executeSet(database, data.attendanceRecords.map(this.attendanceStatement))
 
       await database.commitTransaction()
@@ -196,6 +223,21 @@ export class CapacitorSqliteErpRepository implements ErpRepository {
     ],
   })
 
+  private readonly assignmentStatement = (
+    assignment: SiteWorkerAssignment,
+  ): capSQLiteSet => ({
+    statement: assignmentInsert,
+    values: [
+      assignment.id,
+      assignment.siteId,
+      assignment.workerId,
+      assignment.workRole,
+      assignment.dailyRate,
+      assignment.createdAt,
+      assignment.updatedAt,
+    ],
+  })
+
   private toSite(row: SiteRow): Site {
     return {
       id: row.id,
@@ -233,6 +275,18 @@ export class CapacitorSqliteErpRepository implements ErpRepository {
       dailyRate: Number(row.daily_rate),
       active: Number(row.active) === 1,
       createdAt: row.created_at,
+    }
+  }
+
+  private toAssignment(row: SiteWorkerAssignmentRow): SiteWorkerAssignment {
+    return {
+      id: row.id,
+      siteId: row.site_id,
+      workerId: row.worker_id,
+      workRole: row.work_role,
+      dailyRate: Number(row.daily_rate),
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
     }
   }
 

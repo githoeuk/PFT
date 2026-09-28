@@ -6,6 +6,7 @@ const STORAGE_KEY = 'pft.erp.v1'
 const emptyData = (): ErpData => ({
   sites: [],
   workers: [],
+  siteWorkerAssignments: [],
   attendanceRecords: [],
 })
 
@@ -29,7 +30,14 @@ class LocalStorageErpRepository implements ErpRepository {
 
     try {
       const parsed: unknown = JSON.parse(serialized)
-      return isErpData(parsed) ? parsed : emptyData()
+      if (!isErpData(parsed)) return emptyData()
+
+      return {
+        ...parsed,
+        siteWorkerAssignments: Array.isArray(parsed.siteWorkerAssignments)
+          ? parsed.siteWorkerAssignments
+          : [],
+      }
     } catch {
       return emptyData()
     }

@@ -1,3 +1,11 @@
+@font-face {
+  font-family: 'Ria Sans';
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url('../assets/fonts/RiaSans-ExtraBold.otf') format('opentype');
+}
+
 :root {
   color: #202522;
   background: #f3f5f3;
@@ -50,6 +58,81 @@ h1,
 h2,
 p {
   margin: 0;
+}
+
+.pin-screen {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 24px;
+  background: #202522;
+}
+.pin-panel {
+  width: min(100%, 390px);
+  padding: 30px;
+  background: #fff;
+  border: 1px solid #3a403c;
+  border-radius: 8px;
+}
+.pin-brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 30px;
+  color: var(--accent-dark);
+}
+.pin-brand strong {
+  font-size: 20px;
+}
+.pin-icon {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 16px;
+  place-items: center;
+  color: #17221d;
+  background: #e8b83e;
+  border-radius: 6px;
+}
+.pin-panel h1 {
+  font-size: 24px;
+}
+.pin-panel > p {
+  margin-top: 8px;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.pin-panel > small {
+  display: block;
+  margin-top: 16px;
+  color: var(--text-muted);
+  font-size: 10px;
+  text-align: center;
+}
+.pin-form {
+  display: grid;
+  gap: 14px;
+  margin-top: 24px;
+}
+.pin-form label {
+  display: grid;
+  gap: 7px;
+}
+.pin-form label span {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+.pin-form input {
+  height: 48px;
+  font-size: 18px;
+  text-align: center;
+}
+.pin-error {
+  color: var(--danger);
+  font-size: 12px;
+  text-align: center;
 }
 
 .app-shell {
@@ -160,6 +243,11 @@ p {
 .topbar strong {
   font-size: 14px;
 }
+.topbar .topbar-brand {
+  font-family: 'Ria Sans', 'Noto Sans KR', sans-serif;
+  font-size: 19px;
+  font-weight: 800;
+}
 .topbar div > span {
   margin-top: 2px;
   color: var(--text-muted);
@@ -264,6 +352,9 @@ p {
   background: transparent;
   border: 1px solid var(--border);
   border-radius: 6px;
+}
+.danger-button {
+  color: var(--danger);
 }
 .text-link {
   color: var(--accent);
@@ -571,6 +662,13 @@ select:focus {
   background: var(--surface-muted);
   border-top: 1px solid var(--border);
 }
+.assignment-editor {
+  background: var(--surface-muted);
+  border-bottom: 1px solid var(--border);
+}
+.assignment-form-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
 .table-section {
   min-height: 300px;
 }
@@ -701,8 +799,8 @@ select:focus {
 }
 .attendance-grid {
   display: grid;
-  min-width: 900px;
-  grid-template-columns: minmax(120px, 1.2fr) 105px 105px 80px 80px 65px minmax(120px, 1fr) 90px;
+  min-width: 1080px;
+  grid-template-columns: minmax(120px, 1.1fr) 100px 105px 78px 78px 62px 105px minmax(110px, 0.9fr) 90px;
   gap: 10px;
   align-items: center;
 }
@@ -754,6 +852,7 @@ select:focus {
   gap: 20px;
   padding: 10px 16px;
   background: var(--surface-muted);
+  border-top: 1px solid var(--border);
 }
 .save-message {
   display: inline-flex;
@@ -778,8 +877,8 @@ select:focus {
     grid-template-columns: 1fr;
   }
   .attendance-grid {
-    min-width: 820px;
-    grid-template-columns: minmax(110px, 1.1fr) 100px 100px 75px 75px 60px minmax(110px, 1fr) 85px;
+    min-width: 1020px;
+    grid-template-columns: minmax(110px, 1fr) 95px 95px 72px 72px 58px 100px minmax(105px, 0.8fr) 82px;
     gap: 7px;
   }
 }
@@ -928,6 +1027,9 @@ select:focus {
     grid-template-columns: 1fr;
     padding: 16px;
   }
+  .assignment-form-grid {
+    grid-template-columns: 1fr;
+  }
   .form-grid .span-2 {
     grid-column: auto;
   }
@@ -962,7 +1064,7 @@ select:focus {
   }
   .worker-cell,
   .attendance-row label:nth-of-type(1),
-  .attendance-row label:nth-of-type(6) {
+  .attendance-row label:nth-of-type(7) {
     grid-column: 1 / -1;
   }
   .mobile-label {
@@ -976,12 +1078,23 @@ select:focus {
     text-align: right;
   }
   .attendance-footer {
-    position: sticky;
-    bottom: 64px;
+    position: static;
+    min-height: 72px;
+    padding: 14px 16px;
   }
 }
 
 @media (max-width: 420px) {
+  .pin-screen {
+    padding: 0;
+    background: #fff;
+  }
+  .pin-panel {
+    min-height: 100vh;
+    padding: 26px 20px;
+    border: 0;
+    border-radius: 0;
+  }
   .page-heading {
     gap: 10px;
   }

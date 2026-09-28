@@ -31,6 +31,15 @@ const workedDays = computed(() => calculateWorkedDays(records.value))
 const siteCount = computed(() => new Set(workedRecords.value.map((record) => record.siteId)).size)
 const totalLaborCost = computed(() => sumLaborCost(records.value))
 const lastWorkDate = computed(() => workedRecords.value[0]?.date ?? '')
+const currentAssignments = computed(() =>
+  store.siteWorkerAssignments
+    .filter((assignment) => assignment.workerId === workerId.value)
+    .map((assignment) => ({
+      assignment,
+      site: store.sites.find((candidate) => candidate.id === assignment.siteId),
+    }))
+    .filter((item) => item.site !== undefined),
+)
 
 const siteHistory = computed(() => {
   const siteIds = [...new Set(workedRecords.value.map((record) => record.siteId))]
@@ -80,7 +89,7 @@ const siteHistory = computed(() => {
           <dd>{{ worker.phone || '연락처 없음' }}</dd>
         </div>
         <div>
-          <dt>현재 일당</dt>
+          <dt>기본 일급</dt>
           <dd>{{ formatCurrency(worker.dailyRate) }}</dd>
         </div>
       </dl>
@@ -113,6 +122,43 @@ const siteHistory = computed(() => {
           ><strong class="money-value">{{ formatCurrency(totalLaborCost) }}</strong>
         </div>
       </article>
+    </section>
+
+    <section class="content-section table-section detail-section">
+      <div class="section-heading">
+        <div>
+          <h2>현재 현장 배정</h2>
+          <p>현장별 적용 직책과 일급</p>
+        </div>
+      </div>
+      <div v-if="currentAssignments.length" class="data-table-wrap">
+        <table class="data-table management-table">
+          <thead>
+            <tr>
+              <th>현장</th>
+              <th>현장 직책</th>
+              <th>현장 일급</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="item in currentAssignments" :key="item.assignment.id">
+              <td data-label="현장">
+                <strong>{{ item.site!.name }}</strong
+                ><small>{{ item.site!.address || '주소 없음' }}</small>
+              </td>
+              <td data-label="현장 직책">{{ workerRoleLabels[item.assignment.workRole] }}</td>
+              <td data-label="현장 일급">{{ formatCurrency(item.assignment.dailyRate) }}</td>
+              <td class="table-action-cell" data-label="상세">
+                <RouterLink class="text-link" :to="`/sites/${item.site!.id}`">현장 보기</RouterLink>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div v-else class="empty-state">
+        <MapPinned :size="28" /><strong>현재 배정된 현장이 없습니다</strong>
+      </div>
     </section>
 
     <section class="content-section table-section detail-section">
@@ -173,6 +219,7 @@ const siteHistory = computed(() => {
               <th>상태</th>
               <th>시간</th>
               <th>연장</th>
+              <th>적용 일급</th>
               <th>인건비</th>
             </tr>
           </thead>
@@ -186,6 +233,7 @@ const siteHistory = computed(() => {
               <td>{{ attendanceStatusLabels[record.status] }}</td>
               <td>{{ record.startTime || '-' }} - {{ record.endTime || '-' }}</td>
               <td>{{ record.overtimeHours }}시간</td>
+              <td>{{ formatCurrency(record.dailyRate) }}</td>
               <td>{{ formatCurrency(sumLaborCost([record])) }}</td>
             </tr>
           </tbody>

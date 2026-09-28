@@ -27,6 +27,16 @@ export interface Worker {
   createdAt: string
 }
 
+export interface SiteWorkerAssignment {
+  id: string
+  siteId: string
+  workerId: string
+  workRole: WorkerRole
+  dailyRate: number
+  createdAt: string
+  updatedAt: string
+}
+
 export interface AttendanceRecord {
   id: string
   date: string
@@ -46,9 +56,14 @@ export interface AttendanceRecord {
 export interface ErpData {
   sites: Site[]
   workers: Worker[]
+  siteWorkerAssignments: SiteWorkerAssignment[]
   attendanceRecords: AttendanceRecord[]
 }
 
 export type NewSite = Omit<Site, 'id' | 'createdAt'>
 export type NewWorker = Omit<Worker, 'id' | 'createdAt'>
+export type SiteWorkerAssignmentInput = Omit<
+  SiteWorkerAssignment,
+  'id' | 'createdAt' | 'updatedAt'
+>
 export type AttendanceInput = Omit<AttendanceRecord, 'id' | 'createdAt' | 'updatedAt'>
