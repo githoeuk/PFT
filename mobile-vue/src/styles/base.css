@@ -722,6 +722,20 @@ select:focus {
   width: 110px;
   min-width: 110px;
 }
+.payroll-site-row td {
+  height: 52px;
+  background: var(--surface-muted);
+}
+
+.payroll-site-row td:first-child {
+  padding-left: 32px;
+  color: var(--text-muted);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.payroll-site-row .text-link {
+  font-weight: 700;
+}
 .table-actions {
   display: flex;
   justify-content: flex-end;

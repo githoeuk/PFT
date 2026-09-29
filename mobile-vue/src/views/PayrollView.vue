@@ -5,6 +5,8 @@ import {
   CircleDollarSign,
   ClipboardCheck,
   Users,
+  ChevronDown,
+  ChevronUp,
 } from '@lucide/vue'
 import { calculateWorkedDays, sumLaborCost } from '@/services/attendanceService'
 import { useErpStore } from '@/stores/erp'
@@ -15,6 +17,17 @@ import { workerRoleLabels } from '@/utils/erpLabels'
 const store = useErpStore()
 
 const selectedMonth = ref(todayIso().slice(0, 7))
+
+const expandedWorkerIds = ref<string[]>([])
+
+const isWorkerExpanded = (workerId: string): boolean =>
+  expandedWorkerIds.value.includes(workerId)
+
+const toggleWorkerDetails = (workerId: string) => {
+  expandedWorkerIds.value = isWorkerExpanded(workerId)
+    ? expandedWorkerIds.value.filter((id) => id !== workerId)
+    : [...expandedWorkerIds.value, workerId]
+}
 
 const monthRecords = computed(() => {
   if (!selectedMonth.value) {
@@ -44,7 +57,6 @@ const workedDays = computed(() =>
 const totalLaborCost = computed(() =>
   sumLaborCost(monthRecords.value),
 )
-
 const payrollRows = computed(() => {
   const recordsByWorker = new Map<string, AttendanceRecord[]>()
 
@@ -59,6 +71,50 @@ const payrollRows = computed(() => {
       const worker = store.workers.find(
         (candidate) => candidate.id === workerId,
       )
+
+      const recordsBySite = new Map<string, AttendanceRecord[]>()
+
+      for (const record of records) {
+        const siteRecords = recordsBySite.get(record.siteId) ?? []
+        siteRecords.push(record)
+        recordsBySite.set(record.siteId, siteRecords)
+      }
+
+      const siteRows = Array.from(recordsBySite.entries())
+        .map(([siteId, siteRecords]) => {
+          const site = store.sites.find(
+            (candidate) => candidate.id === siteId,
+          )
+          const siteDailyRates = siteRecords.map(
+            (record) => record.dailyRate,
+          )
+          const minimumSiteRate = Math.min(...siteDailyRates)
+          const maximumSiteRate = Math.max(...siteDailyRates)
+
+          return {
+            siteId,
+            siteExists: Boolean(site),
+            siteName: site?.name ?? '삭제된 현장',
+            roles: [
+              ...new Set(
+                siteRecords.map(
+                  (record) => workerRoleLabels[record.workRole],
+                ),
+              ),
+            ].join(', '),
+            workedDays: calculateWorkedDays(siteRecords),
+            overtimeHours: siteRecords.reduce(
+              (total, record) => total + record.overtimeHours,
+              0,
+            ),
+            dailyRateText:
+              minimumSiteRate === maximumSiteRate
+                ? formatCurrency(minimumSiteRate)
+                : `${formatCurrency(minimumSiteRate)} ~ ${formatCurrency(maximumSiteRate)}`,
+            laborCost: sumLaborCost(siteRecords),
+          }
+        })
+        .sort((a, b) => a.siteName.localeCompare(b.siteName, 'ko-KR'))
 
       const siteNames = [
         ...new Set(
@@ -97,6 +153,7 @@ const payrollRows = computed(() => {
             ? formatCurrency(minimumDailyRate)
             : `${formatCurrency(minimumDailyRate)} ~ ${formatCurrency(maximumDailyRate)}`,
         laborCost: sumLaborCost(records),
+        siteRows,
       }
     })
     .sort((a, b) => a.workerName.localeCompare(b.workerName, 'ko-KR'))
@@ -182,35 +239,78 @@ const payrollRows = computed(() => {
           <th>연장시간</th>
           <th>적용 일급</th>
           <th>지급액</th>
-          <th></th>
+          <th aria-label="현장별 정산 보기"></th>
         </tr>
         </thead>
 
         <tbody>
-        <tr v-for="row in payrollRows" :key="row.workerId">
-          <td>
-            <strong>{{ row.workerName }}</strong>
-            <small>{{ row.team }}</small>
-          </td>
-          <td>{{ row.siteNames }}</td>
-          <td>{{ row.roles }}</td>
-          <td>{{ row.workedDays }}일</td>
-          <td>{{ row.overtimeHours }}시간</td>
-          <td>{{ row.dailyRateText }}</td>
-          <td>
-            <strong>{{ formatCurrency(row.laborCost) }}</strong>
-          </td>
-          <td class="table-action-cell">
-            <RouterLink
-              v-if="row.workerExists"
-              class="text-link"
-              :to="`/workers/${row.workerId}`"
-            >
-              기록 보기
-            </RouterLink>
-            <span v-else>-</span>
-          </td>
-        </tr>
+        <template v-for="row in payrollRows" :key="row.workerId">
+          <tr>
+            <td>
+              <RouterLink
+                v-if="row.workerExists"
+                class="text-link"
+                :to="`/workers/${row.workerId}`"
+              >
+                {{ row.workerName }}
+              </RouterLink>
+              <strong v-else>{{ row.workerName }}</strong>
+              <small>{{ row.team }}</small>
+            </td>
+            <td>{{ row.siteNames }}</td>
+            <td>{{ row.roles }}</td>
+            <td>{{ row.workedDays }}일</td>
+            <td>{{ row.overtimeHours }}시간</td>
+            <td>{{ row.dailyRateText }}</td>
+            <td>
+              <strong>{{ formatCurrency(row.laborCost) }}</strong>
+            </td>
+            <td class="table-action-cell">
+              <button
+                class="icon-button"
+                type="button"
+                :title="
+            isWorkerExpanded(row.workerId)
+              ? '현장별 정산 접기'
+              : '현장별 정산 펼치기'
+          "
+                :aria-expanded="isWorkerExpanded(row.workerId)"
+                @click="toggleWorkerDetails(row.workerId)"
+              >
+                <ChevronUp
+                  v-if="isWorkerExpanded(row.workerId)"
+                  :size="17"
+                />
+                <ChevronDown v-else :size="17" />
+              </button>
+            </td>
+          </tr>
+
+          <tr
+            v-for="site in row.siteRows"
+            v-show="isWorkerExpanded(row.workerId)"
+            :key="`${row.workerId}-${site.siteId}`"
+            class="payroll-site-row"
+          >
+            <td><small>현장별 내역</small></td>
+            <td>
+              <RouterLink
+                v-if="site.siteExists"
+                class="text-link"
+                :to="`/sites/${site.siteId}`"
+              >
+                {{ site.siteName }}
+              </RouterLink>
+              <strong v-else>{{ site.siteName }}</strong>
+            </td>
+            <td>{{ site.roles }}</td>
+            <td>{{ site.workedDays }}일</td>
+            <td>{{ site.overtimeHours }}시간</td>
+            <td>{{ site.dailyRateText }}</td>
+            <td>{{ formatCurrency(site.laborCost) }}</td>
+            <td></td>
+          </tr>
+        </template>
         </tbody>
       </table>
     </div>
