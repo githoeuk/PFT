@@ -6,10 +6,11 @@ import {
   ClipboardCheck,
   Users,
 } from '@lucide/vue'
-
 import { calculateWorkedDays, sumLaborCost } from '@/services/attendanceService'
 import { useErpStore } from '@/stores/erp'
 import { formatCurrency, todayIso } from '@/utils/formatters'
+import type { AttendanceRecord } from '@/types/erp'
+import { workerRoleLabels } from '@/utils/erpLabels'
 
 const store = useErpStore()
 
@@ -43,6 +44,63 @@ const workedDays = computed(() =>
 const totalLaborCost = computed(() =>
   sumLaborCost(monthRecords.value),
 )
+
+const payrollRows = computed(() => {
+  const recordsByWorker = new Map<string, AttendanceRecord[]>()
+
+  for (const record of workedRecords.value) {
+    const records = recordsByWorker.get(record.workerId) ?? []
+    records.push(record)
+    recordsByWorker.set(record.workerId, records)
+  }
+
+  return Array.from(recordsByWorker.entries())
+    .map(([workerId, records]) => {
+      const worker = store.workers.find(
+        (candidate) => candidate.id === workerId,
+      )
+
+      const siteNames = [
+        ...new Set(
+          records.map(
+            (record) =>
+              store.sites.find((site) => site.id === record.siteId)?.name ??
+              '삭제된 현장',
+          ),
+        ),
+      ]
+
+      const roles = [
+        ...new Set(
+          records.map((record) => workerRoleLabels[record.workRole]),
+        ),
+      ]
+
+      const dailyRates = records.map((record) => record.dailyRate)
+      const minimumDailyRate = Math.min(...dailyRates)
+      const maximumDailyRate = Math.max(...dailyRates)
+
+      return {
+        workerId,
+        workerExists: Boolean(worker),
+        workerName: worker?.name ?? '삭제된 근로자',
+        team: worker?.team || '미지정',
+        siteNames: siteNames.join(', '),
+        roles: roles.join(', '),
+        workedDays: calculateWorkedDays(records),
+        overtimeHours: records.reduce(
+          (total, record) => total + record.overtimeHours,
+          0,
+        ),
+        dailyRateText:
+          minimumDailyRate === maximumDailyRate
+            ? formatCurrency(minimumDailyRate)
+            : `${formatCurrency(minimumDailyRate)} ~ ${formatCurrency(maximumDailyRate)}`,
+        laborCost: sumLaborCost(records),
+      }
+    })
+    .sort((a, b) => a.workerName.localeCompare(b.workerName, 'ko-KR'))
+})
 </script>
 
 <template>
@@ -103,5 +161,63 @@ const totalLaborCost = computed(() =>
         </strong>
       </div>
     </article>
+  </section>
+
+  <section class="content-section table-section">
+    <div class="section-heading">
+      <div>
+        <h2>근로자별 정산</h2>
+        <p>{{ selectedMonth || '선택된 월 없음' }} 출석 기록 기준</p>
+      </div>
+    </div>
+
+    <div v-if="payrollRows.length" class="data-table-wrap">
+      <table class="data-table">
+        <thead>
+        <tr>
+          <th>근로자</th>
+          <th>작업 현장</th>
+          <th>작업 직책</th>
+          <th>작업일</th>
+          <th>연장시간</th>
+          <th>적용 일급</th>
+          <th>지급액</th>
+          <th></th>
+        </tr>
+        </thead>
+
+        <tbody>
+        <tr v-for="row in payrollRows" :key="row.workerId">
+          <td>
+            <strong>{{ row.workerName }}</strong>
+            <small>{{ row.team }}</small>
+          </td>
+          <td>{{ row.siteNames }}</td>
+          <td>{{ row.roles }}</td>
+          <td>{{ row.workedDays }}일</td>
+          <td>{{ row.overtimeHours }}시간</td>
+          <td>{{ row.dailyRateText }}</td>
+          <td>
+            <strong>{{ formatCurrency(row.laborCost) }}</strong>
+          </td>
+          <td class="table-action-cell">
+            <RouterLink
+              v-if="row.workerExists"
+              class="text-link"
+              :to="`/workers/${row.workerId}`"
+            >
+              기록 보기
+            </RouterLink>
+            <span v-else>-</span>
+          </td>
+        </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div v-else class="empty-state">
+      <Users :size="28" />
+      <strong>선택한 월의 작업 기록이 없습니다</strong>
+    </div>
   </section>
 </template>
