@@ -1,7 +1,16 @@
 <script setup lang="ts">
-import { ClipboardCheck, Database, HardHat, LayoutDashboard, MapPinned, Users } from '@lucide/vue'
 
 import { useErpStore } from '@/stores/erp'
+
+import {
+  CircleDollarSign,
+  ClipboardCheck,
+  Database,
+  HardHat,
+  LayoutDashboard,
+  MapPinned,
+  Users,
+} from '@lucide/vue'
 
 const store = useErpStore()
 
@@ -10,6 +19,7 @@ const navigation = [
   { to: '/attendance', label: '출석 관리', icon: ClipboardCheck },
   { to: '/sites', label: '현장 관리', icon: MapPinned },
   { to: '/workers', label: '근로자 관리', icon: Users },
+  { to: '/payroll', label: '정산 관리', icon: CircleDollarSign },
 ]
 </script>
 

@@ -15,11 +15,15 @@ const store = useErpStore()
 
 const selectedMonth = ref(todayIso().slice(0, 7))
 
-const monthRecords = computed(() =>
-  store.attendanceRecords.filter((record) =>
+const monthRecords = computed(() => {
+  if (!selectedMonth.value) {
+    return []
+  }
+
+  return store.attendanceRecords.filter((record) =>
     record.date.startsWith(selectedMonth.value),
-  ),
-)
+  )
+})
 
 const workedRecords = computed(() =>
   monthRecords.value.filter(
