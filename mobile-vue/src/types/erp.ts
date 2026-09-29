@@ -5,6 +5,20 @@ export type WorkerRole = 'supervisor' | 'team_lead' | 'painter' | 'helper'
 export type AttendanceStatus =
   'present' | 'half_day' | 'absent' | 'leave' | 'weather' | 'site_closed'
 
+export type PayrollSettlementStatus = 'unpaid' | 'paid'
+
+export interface PayrollSettlement {
+  id: string
+  month: string
+  workerId: string
+  status: PayrollSettlementStatus
+  settledAmount: number
+  paidDate: string
+  note: string
+  createdAt: string
+  updatedAt: string
+}
+
 export interface Site {
   id: string
   name: string
@@ -58,12 +72,11 @@ export interface ErpData {
   workers: Worker[]
   siteWorkerAssignments: SiteWorkerAssignment[]
   attendanceRecords: AttendanceRecord[]
+  payrollSettlements: PayrollSettlement[]
 }
 
 export type NewSite = Omit<Site, 'id' | 'createdAt'>
 export type NewWorker = Omit<Worker, 'id' | 'createdAt'>
-export type SiteWorkerAssignmentInput = Omit<
-  SiteWorkerAssignment,
-  'id' | 'createdAt' | 'updatedAt'
->
+export type SiteWorkerAssignmentInput = Omit<SiteWorkerAssignment, 'id' | 'createdAt' | 'updatedAt'>
 export type AttendanceInput = Omit<AttendanceRecord, 'id' | 'createdAt' | 'updatedAt'>
+export type PayrollSettlementInput = Omit<PayrollSettlement, 'id' | 'createdAt' | 'updatedAt'>

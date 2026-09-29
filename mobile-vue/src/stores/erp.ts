@@ -15,6 +15,8 @@ import type {
   SiteWorkerAssignment,
   SiteWorkerAssignmentInput,
   Worker,
+  PayrollSettlement,
+  PayrollSettlementInput,
 } from '@/types/erp'
 import { todayIso } from '@/utils/formatters'
 
@@ -26,6 +28,7 @@ export const useErpStore = defineStore('erp', () => {
   const workers = ref<Worker[]>([])
   const siteWorkerAssignments = ref<SiteWorkerAssignment[]>([])
   const attendanceRecords = ref<AttendanceRecord[]>([])
+  const payrollSettlements = ref<PayrollSettlement[]>([])
   const hydrated = ref(false)
   const storageMode = ref<ErpRepository['kind']>('browser')
   const storageError = ref('')
@@ -48,6 +51,7 @@ export const useErpStore = defineStore('erp', () => {
     workers: workers.value.map((worker) => ({ ...worker })),
     siteWorkerAssignments: siteWorkerAssignments.value.map((assignment) => ({ ...assignment })),
     attendanceRecords: attendanceRecords.value.map((record) => ({ ...record })),
+    payrollSettlements: payrollSettlements.value.map((settlement) => ({ ...settlement })),
   })
 
   const persist = () => {
@@ -78,6 +82,7 @@ export const useErpStore = defineStore('erp', () => {
         ...record,
         workRole: record.workRole || workerRoles.get(record.workerId) || 'painter',
       }))
+      payrollSettlements.value = data.payrollSettlements
     } catch (error) {
       console.error('Failed to load ERP data', error)
       storageError.value = '로컬 저장소를 열지 못했습니다'
@@ -126,8 +131,7 @@ export const useErpStore = defineStore('erp', () => {
 
   function upsertSiteWorkerAssignment(input: SiteWorkerAssignmentInput): SiteWorkerAssignment {
     const existing = siteWorkerAssignments.value.find(
-      (assignment) =>
-        assignment.siteId === input.siteId && assignment.workerId === input.workerId,
+      (assignment) => assignment.siteId === input.siteId && assignment.workerId === input.workerId,
     )
     const now = new Date().toISOString()
 
@@ -200,6 +204,34 @@ export const useErpStore = defineStore('erp', () => {
     )
   }
 
+  function payrollSettlementFor(month: string, workerId: string): PayrollSettlement | undefined {
+    return payrollSettlements.value.find(
+      (settlement) => settlement.month === month && settlement.workerId === workerId,
+    )
+  }
+
+  function upsertPayrollSettlement(input: PayrollSettlementInput): PayrollSettlement {
+    const existing = payrollSettlementFor(input.month, input.workerId)
+    const now = new Date().toISOString()
+
+    if (existing) {
+      Object.assign(existing, input, { updatedAt: now })
+      persist()
+      return existing
+    }
+
+    const created: PayrollSettlement = {
+      ...input,
+      id: createId('settlement'),
+      createdAt: now,
+      updatedAt: now,
+    }
+
+    payrollSettlements.value.unshift(created)
+    persist()
+    return created
+  }
+
   return {
     sites,
     workers,
@@ -225,5 +257,8 @@ export const useErpStore = defineStore('erp', () => {
     upsertAttendance,
     attendanceFor,
     laborCostFor,
+    payrollSettlements,
+    payrollSettlementFor,
+    upsertPayrollSettlement,
   }
 })

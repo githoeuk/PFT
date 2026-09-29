@@ -16,6 +16,8 @@ import type {
   SiteWorkerAssignment,
   Worker,
   WorkerRole,
+  PayrollSettlement,
+  PayrollSettlementStatus,
 } from '@/types/erp'
 
 interface SiteRow {
@@ -66,29 +68,47 @@ interface SiteWorkerAssignmentRow {
   updated_at: string
 }
 
+interface PayrollSettlementRow {
+  id: string
+  settlement_month: string
+  worker_id: string
+  status: PayrollSettlementStatus
+  settled_amount: number
+  paid_date: string
+  note: string
+  created_at: string
+  updated_at: string
+}
+
 const siteInsert = `
   INSERT INTO sites
-    (id, name, client, address, start_date, end_date, status, created_at)
+  (id, name, client, address, start_date, end_date, status, created_at)
   VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 const workerInsert = `
   INSERT INTO workers
-    (id, name, phone, team, role, daily_rate, active, created_at)
+  (id, name, phone, team, role, daily_rate, active, created_at)
   VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 const attendanceInsert = `
   INSERT INTO attendance_records
-    (id, work_date, site_id, worker_id, work_role, status, start_time, end_time,
-     overtime_hours, daily_rate, note, created_at, updated_at)
+  (id, work_date, site_id, worker_id, work_role, status, start_time, end_time,
+   overtime_hours, daily_rate, note, created_at, updated_at)
   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 const assignmentInsert = `
   INSERT INTO site_worker_assignments
-    (id, site_id, worker_id, work_role, daily_rate, created_at, updated_at)
+  (id, site_id, worker_id, work_role, daily_rate, created_at, updated_at)
   VALUES (?, ?, ?, ?, ?, ?, ?)
+`
+const payrollSettlementInsert = `
+  INSERT INTO payroll_settlements
+  (id, settlement_month, worker_id, status, settled_amount,
+   paid_date, note, created_at, updated_at)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 export class CapacitorSqliteErpRepository implements ErpRepository {
@@ -107,6 +127,11 @@ export class CapacitorSqliteErpRepository implements ErpRepository {
     const attendanceResult = await database.query(
       'SELECT * FROM attendance_records ORDER BY work_date DESC, created_at DESC',
     )
+    const payrollSettlementResult = await database.query(
+      `SELECT *
+       FROM payroll_settlements
+       ORDER BY settlement_month DESC, created_at DESC`,
+    )
 
     const sites = (siteResult.values ?? []).map((row) => this.toSite(row as SiteRow))
     const workers = (workerResult.values ?? []).map((row) => this.toWorker(row as WorkerRow))
@@ -117,7 +142,17 @@ export class CapacitorSqliteErpRepository implements ErpRepository {
       this.toAttendance(row as AttendanceRow),
     )
 
-    return { sites, workers, siteWorkerAssignments, attendanceRecords }
+    const payrollSettlements = (payrollSettlementResult.values ?? []).map((row) =>
+      this.toPayrollSettlement(row as PayrollSettlementRow),
+    )
+
+    return {
+      sites,
+      workers,
+      siteWorkerAssignments,
+      attendanceRecords,
+      payrollSettlements,
+    }
   }
 
   async save(data: ErpData): Promise<void> {
@@ -126,18 +161,19 @@ export class CapacitorSqliteErpRepository implements ErpRepository {
 
     try {
       await database.execute(
-        'DELETE FROM attendance_records; DELETE FROM site_worker_assignments; DELETE FROM workers; DELETE FROM sites;',
+        `DELETE FROM payroll_settlements;
+        DELETE FROM attendance_records;
+        DELETE FROM site_worker_assignments;
+        DELETE FROM workers;
+        DELETE FROM sites;`,
         false,
       )
 
       await this.executeSet(database, data.sites.map(this.siteStatement))
       await this.executeSet(database, data.workers.map(this.workerStatement))
-      await this.executeSet(
-        database,
-        data.siteWorkerAssignments.map(this.assignmentStatement),
-      )
+      await this.executeSet(database, data.siteWorkerAssignments.map(this.assignmentStatement))
       await this.executeSet(database, data.attendanceRecords.map(this.attendanceStatement))
-
+      await this.executeSet(database, data.payrollSettlements.map(this.payrollSettlementStatement))
       await database.commitTransaction()
     } catch (error) {
       await database.rollbackTransaction().catch(() => undefined)
@@ -223,9 +259,7 @@ export class CapacitorSqliteErpRepository implements ErpRepository {
     ],
   })
 
-  private readonly assignmentStatement = (
-    assignment: SiteWorkerAssignment,
-  ): capSQLiteSet => ({
+  private readonly assignmentStatement = (assignment: SiteWorkerAssignment): capSQLiteSet => ({
     statement: assignmentInsert,
     values: [
       assignment.id,
@@ -235,6 +269,21 @@ export class CapacitorSqliteErpRepository implements ErpRepository {
       assignment.dailyRate,
       assignment.createdAt,
       assignment.updatedAt,
+    ],
+  })
+
+  private readonly payrollSettlementStatement = (settlement: PayrollSettlement): capSQLiteSet => ({
+    statement: payrollSettlementInsert,
+    values: [
+      settlement.id,
+      settlement.month,
+      settlement.workerId,
+      settlement.status,
+      settlement.settledAmount,
+      settlement.paidDate,
+      settlement.note,
+      settlement.createdAt,
+      settlement.updatedAt,
     ],
   })
 
@@ -302,6 +351,20 @@ export class CapacitorSqliteErpRepository implements ErpRepository {
       endTime: row.end_time,
       overtimeHours: Number(row.overtime_hours),
       dailyRate: Number(row.daily_rate),
+      note: row.note,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    }
+  }
+
+  private toPayrollSettlement(row: PayrollSettlementRow): PayrollSettlement {
+    return {
+      id: row.id,
+      month: row.settlement_month,
+      workerId: row.worker_id,
+      status: row.status,
+      settledAmount: Number(row.settled_amount),
+      paidDate: row.paid_date,
       note: row.note,
       createdAt: row.created_at,
       updatedAt: row.updated_at,

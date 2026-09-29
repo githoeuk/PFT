@@ -8,6 +8,7 @@ const emptyData = (): ErpData => ({
   workers: [],
   siteWorkerAssignments: [],
   attendanceRecords: [],
+  payrollSettlements: [],
 })
 
 const isErpData = (value: unknown): value is ErpData => {
@@ -36,6 +37,9 @@ class LocalStorageErpRepository implements ErpRepository {
         ...parsed,
         siteWorkerAssignments: Array.isArray(parsed.siteWorkerAssignments)
           ? parsed.siteWorkerAssignments
+          : [],
+        payrollSettlements: Array.isArray(parsed.payrollSettlements)
+          ? parsed.payrollSettlements
           : [],
       }
     } catch {

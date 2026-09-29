@@ -58,6 +58,20 @@ CREATE TABLE IF NOT EXISTS attendance_records (
   FOREIGN KEY(worker_id) REFERENCES workers(id)
 );
 
+CREATE TABLE IF NOT EXISTS payroll_settlements (
+  id TEXT PRIMARY KEY NOT NULL,
+  settlement_month TEXT NOT NULL,
+  worker_id TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'unpaid',
+  settled_amount INTEGER NOT NULL DEFAULT 0,
+  paid_date TEXT NOT NULL DEFAULT '',
+  note TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  UNIQUE(settlement_month, worker_id),
+  FOREIGN KEY(worker_id) REFERENCES workers(id)
+);
+
 CREATE INDEX IF NOT EXISTS idx_attendance_date_site
   ON attendance_records(work_date, site_id);
 CREATE INDEX IF NOT EXISTS idx_attendance_worker
@@ -66,4 +80,8 @@ CREATE INDEX IF NOT EXISTS idx_assignment_site
   ON site_worker_assignments(site_id);
 CREATE INDEX IF NOT EXISTS idx_assignment_worker
   ON site_worker_assignments(worker_id);
+CREATE INDEX IF NOT EXISTS idx_payroll_month
+  ON payroll_settlements(settlement_month);
+CREATE INDEX IF NOT EXISTS idx_payroll_worker
+  ON payroll_settlements(worker_id);
 `

@@ -1,4 +1,4 @@
-import type { AttendanceStatus, SiteStatus, WorkerRole } from '@/types/erp'
+import type { AttendanceStatus, PayrollSettlementStatus, SiteStatus, WorkerRole } from '@/types/erp'
 
 export const siteStatusLabels: Record<SiteStatus, string> = {
   active: '진행 중',
@@ -20,6 +20,11 @@ export const attendanceStatusLabels: Record<AttendanceStatus, string> = {
   leave: '휴가',
   weather: '우천',
   site_closed: '현장 휴무',
+}
+
+export const payrollSettlementStatusLabels: Record<PayrollSettlementStatus, string> = {
+  unpaid: '미지급',
+  paid: '지급 완료',
 }
 
 export const attendanceStatusOptions = Object.entries(attendanceStatusLabels).map(
