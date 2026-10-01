@@ -9,6 +9,7 @@ const emptyData = (): ErpData => ({
   siteWorkerAssignments: [],
   attendanceRecords: [],
   payrollSettlements: [],
+  siteExpenses: [],
 })
 
 const isErpData = (value: unknown): value is ErpData => {
@@ -27,14 +28,24 @@ class LocalStorageErpRepository implements ErpRepository {
 
   async load(): Promise<ErpData> {
     const serialized = window.localStorage.getItem(STORAGE_KEY)
-    if (!serialized) return emptyData()
+    if (serialized === null) return emptyData()
 
     try {
       const parsed: unknown = JSON.parse(serialized)
-      if (!isErpData(parsed)) return emptyData()
+      if (!isErpData(parsed)) throw new Error('Invalid ERP data')
+      for (const key of ['siteWorkerAssignments', 'payrollSettlements', 'siteExpenses'] as const) {
+        if (key in parsed && !Array.isArray(parsed[key])) throw new Error(`Invalid ${key}`)
+      }
 
       return {
         ...parsed,
+        siteExpenses: Array.isArray(parsed.siteExpenses) ? parsed.siteExpenses : [],
+        workers: parsed.workers.map((worker) => ({
+          ...worker,
+          bankName: typeof worker.bankName === 'string' ? worker.bankName : '',
+          accountNumber: typeof worker.accountNumber === 'string' ? worker.accountNumber : '',
+          accountHolder: typeof worker.accountHolder === 'string' ? worker.accountHolder : '',
+        })),
         siteWorkerAssignments: Array.isArray(parsed.siteWorkerAssignments)
           ? parsed.siteWorkerAssignments
           : [],
@@ -43,7 +54,7 @@ class LocalStorageErpRepository implements ErpRepository {
           : [],
       }
     } catch {
-      return emptyData()
+      throw new Error('저장된 데이터 형식을 읽지 못했습니다. 원본은 변경하지 않았습니다.')
     }
   }
 

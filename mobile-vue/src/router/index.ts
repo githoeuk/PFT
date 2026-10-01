@@ -7,6 +7,7 @@ import SitesView from '@/views/SitesView.vue'
 import WorkerDetailView from '@/views/WorkerDetailView.vue'
 import WorkersView from '@/views/WorkersView.vue'
 import PayrollView from '@/views/PayrollView.vue'
+import DataManagementView from '@/views/DataManagementView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -18,6 +19,7 @@ const router = createRouter({
     { path: '/workers', name: 'workers', component: WorkersView },
     { path: '/workers/:workerId', name: 'worker-detail', component: WorkerDetailView },
     { path: '/payroll', name: 'payroll', component: PayrollView },
+    { path: '/data', name: 'data-management', component: DataManagementView },
   ],
   scrollBehavior: () => ({ top: 0 }),
 })

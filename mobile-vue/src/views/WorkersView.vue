@@ -1,7 +1,12 @@
 <script setup lang="ts">
-import { nextTick, reactive, ref } from 'vue'
-import { ChevronRight, Pencil, Plus, Users, X } from '@lucide/vue'
+import { computed, nextTick, reactive, ref } from 'vue'
+import { ChevronRight, Pencil, Plus, Trash2, Users, X } from '@lucide/vue'
 
+import {
+  formatWorkerBankAccount,
+  hasWorkerBankAccount,
+  validateWorkerBankAccount,
+} from '@/services/workerBankAccountService'
 import { useErpStore } from '@/stores/erp'
 import type { NewWorker, Worker } from '@/types/erp'
 import { workerRoleLabels } from '@/utils/erpLabels'
@@ -11,6 +16,8 @@ const store = useErpStore()
 const showForm = ref(false)
 const editingWorkerId = ref<string | null>(null)
 const editorPanel = ref<HTMLFormElement | null>(null)
+const formError = ref('')
+const accountMessage = ref('')
 
 const blankForm = (): NewWorker => ({
   name: '',
@@ -18,9 +25,16 @@ const blankForm = (): NewWorker => ({
   team: '',
   role: 'painter',
   dailyRate: 0,
+  bankName: '',
+  accountNumber: '',
+  accountHolder: '',
   active: true,
 })
 const form = reactive<NewWorker>(blankForm())
+const editingWorkerHasBankAccount = computed(() => {
+  const worker = store.workers.find((candidate) => candidate.id === editingWorkerId.value)
+  return worker ? hasWorkerBankAccount(worker) : false
+})
 
 function showEditor() {
   showForm.value = true
@@ -30,6 +44,8 @@ function showEditor() {
 function openCreateForm() {
   editingWorkerId.value = null
   Object.assign(form, blankForm())
+  formError.value = ''
+  accountMessage.value = ''
   showEditor()
 }
 
@@ -41,8 +57,13 @@ function openEditForm(worker: Worker) {
     team: worker.team,
     role: worker.role,
     dailyRate: worker.dailyRate,
+    bankName: worker.bankName,
+    accountNumber: worker.accountNumber,
+    accountHolder: worker.accountHolder,
     active: worker.active,
   })
+  formError.value = ''
+  accountMessage.value = ''
   showEditor()
 }
 
@@ -50,21 +71,56 @@ function resetForm() {
   Object.assign(form, blankForm())
   editingWorkerId.value = null
   showForm.value = false
+  formError.value = ''
+  accountMessage.value = ''
 }
 
-function submit() {
-  if (!form.name.trim()) return
+async function submit() {
+  if (!form.name.trim() || store.saving) return
   const input: NewWorker = {
     ...form,
     name: form.name.trim(),
     phone: form.phone.trim(),
     team: form.team.trim(),
     dailyRate: Number(form.dailyRate),
+    bankName: form.bankName.trim(),
+    accountNumber: form.accountNumber.trim(),
+    accountHolder: form.accountHolder.trim(),
   }
 
-  if (editingWorkerId.value) store.updateWorker(editingWorkerId.value, input)
-  else store.addWorker(input)
-  resetForm()
+  const accountError = validateWorkerBankAccount(input)
+  if (accountError) {
+    formError.value = accountError
+    return
+  }
+
+  try {
+    if (editingWorkerId.value) await store.updateWorker(editingWorkerId.value, input)
+    else await store.addWorker(input)
+    resetForm()
+  } catch {
+    formError.value = store.storageError
+  }
+}
+
+async function deleteBankAccount() {
+  if (!editingWorkerId.value || store.saving) return
+
+  const worker = store.workers.find((candidate) => candidate.id === editingWorkerId.value)
+  if (!worker || !hasWorkerBankAccount(worker)) return
+  if (!window.confirm(`${worker.name}의 계좌정보를 삭제하시겠습니까?`)) return
+
+  try {
+    await store.clearWorkerBankAccount(worker.id)
+  } catch {
+    formError.value = store.storageError
+    return
+  }
+  form.bankName = ''
+  form.accountNumber = ''
+  form.accountHolder = ''
+  formError.value = ''
+  accountMessage.value = '계좌정보를 삭제했습니다'
 }
 </script>
 
@@ -110,12 +166,41 @@ function submit() {
         ><span>일당 (원)</span
         ><input v-model.number="form.dailyRate" type="number" min="0" step="1000"
       /></label>
+      <div class="form-section-heading span-2">
+        <strong>급여 계좌</strong>
+        <small>임금 지급에 사용하는 근로자 본인 명의 계좌</small>
+      </div>
+      <label><span>은행명</span><input v-model="form.bankName" placeholder="예: 국민은행" /></label>
+      <label
+        ><span>예금주</span><input v-model="form.accountHolder" placeholder="근로자 본인 이름"
+      /></label>
+      <label class="span-2"
+        ><span>계좌번호</span
+        ><input
+          v-model="form.accountNumber"
+          inputmode="numeric"
+          autocomplete="off"
+          pattern="[0-9-]*"
+          placeholder="숫자와 하이픈만 입력"
+      /></label>
     </div>
-    <div class="form-actions">
-      <button class="button button-ghost" type="button" @click="resetForm">취소</button
-      ><button class="button button-primary" type="submit">
-        {{ editingWorkerId ? '수정 저장' : '근로자 저장' }}
+    <p v-if="formError" class="form-message form-message-error">{{ formError }}</p>
+    <p v-if="accountMessage" class="form-message">{{ accountMessage }}</p>
+    <div class="form-actions form-actions-split">
+      <button
+        v-if="editingWorkerHasBankAccount"
+        class="button button-secondary danger-button"
+        type="button"
+        @click="deleteBankAccount"
+      >
+        <Trash2 :size="16" /> 계좌정보 삭제
       </button>
+      <div>
+        <button class="button button-ghost" type="button" @click="resetForm">취소</button
+        ><button class="button button-primary" type="submit">
+          {{ editingWorkerId ? '수정 저장' : '근로자 저장' }}
+        </button>
+      </div>
     </div>
   </form>
 
@@ -127,6 +212,7 @@ function submit() {
             <th>근로자</th>
             <th>소속 / 직책</th>
             <th>일당</th>
+            <th>급여 계좌</th>
             <th>상태</th>
             <th aria-label="관리"></th>
           </tr>
@@ -141,12 +227,17 @@ function submit() {
               {{ worker.team || '미지정' }} / {{ workerRoleLabels[worker.role] }}
             </td>
             <td data-label="일당">{{ formatCurrency(worker.dailyRate) }}</td>
+            <td data-label="급여 계좌">
+              <span>{{ formatWorkerBankAccount(worker) }}</span>
+              <small v-if="worker.accountHolder">예금주 {{ worker.accountHolder }}</small>
+            </td>
             <td data-label="상태">
               <button
                 class="toggle-button"
                 :class="{ active: worker.active }"
                 type="button"
-                @click="store.toggleWorker(worker.id)"
+                :disabled="store.saving"
+                @click="store.toggleWorker(worker.id).catch(() => undefined)"
               >
                 <i></i>{{ worker.active ? '활동' : '비활동' }}
               </button>

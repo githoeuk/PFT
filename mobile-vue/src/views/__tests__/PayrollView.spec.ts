@@ -1,7 +1,7 @@
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it } from 'vitest'
 
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { todayIso } from '@/utils/formatters'
 import { useErpStore } from '@/stores/erp'
 import PayrollView from '@/views/PayrollView.vue'
@@ -13,6 +13,7 @@ describe('PayrollView', () => {
     const pinia = createPinia()
     setActivePinia(pinia)
     const store = useErpStore()
+    await store.hydrate()
     const month = todayIso().slice(0, 7)
 
     store.workers = [
@@ -23,6 +24,9 @@ describe('PayrollView', () => {
         team: '도장팀',
         role: 'painter',
         dailyRate: 200_000,
+        bankName: '국민은행',
+        accountNumber: '123-456-789012',
+        accountHolder: '근로자 A',
         active: true,
         createdAt: '2026-09-01T00:00:00.000Z',
       },
@@ -66,11 +70,14 @@ describe('PayrollView', () => {
       },
     })
 
+    expect(wrapper.get('#payroll-tab-sites').attributes('aria-selected')).toBe('true')
+    await wrapper.get('#payroll-tab-workers').trigger('click')
     await wrapper.get('button[title="지급 정보 수정"]').trigger('click')
     await wrapper.get('select').setValue('paid')
     await wrapper.get('input[type="date"]').setValue(`${month}-30`)
     await wrapper.get('input[type="text"]').setValue('계좌 이체')
     await wrapper.get('form').trigger('submit')
+    await flushPromises()
 
     expect(store.payrollSettlements).toHaveLength(1)
     expect(store.payrollSettlements[0]).toMatchObject({

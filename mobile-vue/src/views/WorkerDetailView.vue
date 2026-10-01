@@ -10,6 +10,7 @@ import {
 import { useRoute } from 'vue-router'
 
 import { calculateWorkedDays, sumLaborCost } from '@/services/attendanceService'
+import { formatWorkerBankAccount } from '@/services/workerBankAccountService'
 import { useErpStore } from '@/stores/erp'
 import { attendanceStatusLabels, workerRoleLabels } from '@/utils/erpLabels'
 import { formatCurrency, formatDate } from '@/utils/formatters'
@@ -78,7 +79,7 @@ const siteHistory = computed(() => {
       }}</span>
     </section>
 
-    <section class="detail-meta" aria-label="근로자 기본 정보">
+    <section class="detail-meta worker-detail-meta" aria-label="근로자 기본 정보">
       <dl>
         <div>
           <dt>기본 직책</dt>
@@ -91,6 +92,13 @@ const siteHistory = computed(() => {
         <div>
           <dt>기본 일급</dt>
           <dd>{{ formatCurrency(worker.dailyRate) }}</dd>
+        </div>
+        <div>
+          <dt>급여 계좌</dt>
+          <dd>
+            {{ formatWorkerBankAccount(worker) }}
+            <small v-if="worker.accountHolder">예금주 {{ worker.accountHolder }}</small>
+          </dd>
         </div>
       </dl>
     </section>

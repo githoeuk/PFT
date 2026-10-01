@@ -5,7 +5,7 @@ import { useRoute } from 'vue-router'
 
 import { calculateLaborCost } from '@/services/attendanceService'
 import { useErpStore } from '@/stores/erp'
-import type { AttendanceStatus, WorkerRole } from '@/types/erp'
+import type { AttendanceInput, AttendanceStatus, WorkerRole } from '@/types/erp'
 import { attendanceStatusOptions, workerRoleOptions } from '@/utils/erpLabels'
 import { formatCurrency, todayIso } from '@/utils/formatters'
 
@@ -85,13 +85,14 @@ function loadDrafts() {
   }
 }
 
-function saveAll() {
-  if (!selectedSiteId.value) return
-  let saved = 0
+async function saveAll() {
+  if (!selectedSiteId.value || store.saving) return
+  savedMessage.value = ''
+  const inputs: AttendanceInput[] = []
   for (const worker of attendanceWorkers.value) {
     const draft = drafts[worker.id]
     if (!draft?.status) continue
-    store.upsertAttendance({
+    inputs.push({
       date: selectedDate.value,
       siteId: selectedSiteId.value,
       workerId: worker.id,
@@ -103,10 +104,15 @@ function saveAll() {
       dailyRate: Number(draft.dailyRate) || 0,
       note: draft.note.trim(),
     })
-    saved += 1
   }
-  savedMessage.value = `${saved}건을 저장했습니다`
-  window.setTimeout(() => (savedMessage.value = ''), 2500)
+  try {
+    await store.saveAttendanceRecords(inputs)
+    savedMessage.value = `${inputs.length}건을 저장했습니다`
+    window.setTimeout(() => (savedMessage.value = ''), 2500)
+  } catch {
+    // Keep the drafts open; the shared storage banner reports the failure.
+    return
+  }
 }
 
 watch(
@@ -137,7 +143,7 @@ watch(
     <button
       class="button button-primary"
       type="button"
-      :disabled="!selectedSiteId || selectedCount === 0"
+      :disabled="store.saving || !selectedSiteId || selectedCount === 0"
       @click="saveAll"
     >
       <Save :size="18" /> 저장
@@ -156,8 +162,12 @@ watch(
       </select>
     </label>
     <div class="toolbar-summary">
-      <span><small>선택 인원</small><strong>{{ selectedCount }}</strong></span>
-      <span><small>예상 인건비</small><strong>{{ formatCurrency(estimatedTotal) }}</strong></span>
+      <span
+        ><small>선택 인원</small><strong>{{ selectedCount }}</strong></span
+      >
+      <span
+        ><small>예상 인건비</small><strong>{{ formatCurrency(estimatedTotal) }}</strong></span
+      >
     </div>
   </section>
 
@@ -172,7 +182,8 @@ watch(
       class="attendance-grid attendance-row"
     >
       <div class="worker-cell">
-        <strong>{{ worker.name }}</strong><small>{{ worker.team || '미지정' }}</small>
+        <strong>{{ worker.name }}</strong
+        ><small>{{ worker.team || '미지정' }}</small>
       </div>
       <label>
         <span class="mobile-label">상태</span>
@@ -215,12 +226,7 @@ watch(
       </label>
       <label>
         <span class="mobile-label">적용 일급</span>
-        <input
-          v-model.number="drafts[worker.id]!.dailyRate"
-          type="number"
-          min="0"
-          step="1000"
-        />
+        <input v-model.number="drafts[worker.id]!.dailyRate" type="number" min="0" step="1000" />
       </label>
       <label>
         <span class="mobile-label">비고</span>
@@ -246,7 +252,7 @@ watch(
       <button
         class="button button-primary"
         type="button"
-        :disabled="!selectedSiteId || selectedCount === 0"
+        :disabled="store.saving || !selectedSiteId || selectedCount === 0"
         @click="saveAll"
       >
         <Save :size="18" /> 저장
@@ -256,12 +262,18 @@ watch(
 
   <section v-else class="content-section empty-state">
     <ClipboardCheck :size="30" />
-    <strong>{{ selectedSiteId ? '이 현장에 배정된 근로자가 없습니다' : '출석 등록 준비가 필요합니다' }}</strong>
+    <strong>{{
+      selectedSiteId ? '이 현장에 배정된 근로자가 없습니다' : '출석 등록 준비가 필요합니다'
+    }}</strong>
     <div class="empty-actions">
       <RouterLink v-if="!store.activeSites.length" class="button button-secondary" to="/sites">
         현장 등록
       </RouterLink>
-      <RouterLink v-else-if="selectedSiteId" class="button button-secondary" :to="`/sites/${selectedSiteId}`">
+      <RouterLink
+        v-else-if="selectedSiteId"
+        class="button button-secondary"
+        :to="`/sites/${selectedSiteId}`"
+      >
         현장 근로자 배정
       </RouterLink>
       <RouterLink v-if="!store.activeWorkers.length" class="button button-secondary" to="/workers">

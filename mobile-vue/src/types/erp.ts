@@ -37,6 +37,9 @@ export interface Worker {
   team: string
   role: WorkerRole
   dailyRate: number
+  bankName: string
+  accountNumber: string
+  accountHolder: string
   active: boolean
   createdAt: string
 }
@@ -67,12 +70,26 @@ export interface AttendanceRecord {
   updatedAt: string
 }
 
+export interface SiteExpense {
+  id: string
+  siteId: string
+  date: string
+  description: string
+  amount: number
+  note: string
+  createdAt: string
+  updatedAt: string
+}
+
+export type SiteExpenseInput = Omit<SiteExpense, 'id' | 'createdAt' | 'updatedAt'>
+
 export interface ErpData {
   sites: Site[]
   workers: Worker[]
   siteWorkerAssignments: SiteWorkerAssignment[]
   attendanceRecords: AttendanceRecord[]
   payrollSettlements: PayrollSettlement[]
+  siteExpenses: SiteExpense[]
 }
 
 export type NewSite = Omit<Site, 'id' | 'createdAt'>

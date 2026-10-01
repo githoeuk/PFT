@@ -11,10 +11,24 @@ const emptyData = (): ErpData => ({
   siteWorkerAssignments: [],
   attendanceRecords: [],
   payrollSettlements: [],
+  siteExpenses: [],
 })
 
 describe('localStorageErpRepository', () => {
   beforeEach(() => window.localStorage.clear())
+
+  it.each(['', '{bad json', '{}', 'null', JSON.stringify({ ...emptyData(), siteExpenses: null })])(
+    'rejects unreadable data instead of treating it as an empty database: %s',
+    async (raw) => {
+      window.localStorage.setItem(STORAGE_KEY, raw)
+      await expect(localStorageErpRepository.load()).rejects.toThrow('원본은 변경하지 않았습니다')
+      expect(window.localStorage.getItem(STORAGE_KEY)).toBe(raw)
+    },
+  )
+
+  it('returns an empty database only when no saved key exists', async () => {
+    await expect(localStorageErpRepository.load()).resolves.toEqual(emptyData())
+  })
 
   it('loads legacy data without payroll settlements', async () => {
     const { payrollSettlements: _payrollSettlements, ...legacyData } = emptyData()
@@ -23,6 +37,33 @@ describe('localStorageErpRepository', () => {
     const loaded = await localStorageErpRepository.load()
 
     expect(loaded.payrollSettlements).toEqual([])
+  })
+
+  it('adds empty bank account fields to legacy workers', async () => {
+    const legacyData = {
+      ...emptyData(),
+      workers: [
+        {
+          id: 'worker-1',
+          name: '기존 근로자',
+          phone: '',
+          team: '',
+          role: 'painter',
+          dailyRate: 180_000,
+          active: true,
+          createdAt: '2026-09-01T00:00:00.000Z',
+        },
+      ],
+    }
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(legacyData))
+
+    const loaded = await localStorageErpRepository.load()
+
+    expect(loaded.workers[0]).toMatchObject({
+      bankName: '',
+      accountNumber: '',
+      accountHolder: '',
+    })
   })
 
   it('persists payroll settlements', async () => {

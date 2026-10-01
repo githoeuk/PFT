@@ -22,6 +22,9 @@ CREATE TABLE IF NOT EXISTS workers (
   team TEXT NOT NULL DEFAULT '',
   role TEXT NOT NULL,
   daily_rate INTEGER NOT NULL DEFAULT 0,
+  bank_name TEXT NOT NULL DEFAULT '',
+  account_number TEXT NOT NULL DEFAULT '',
+  account_holder TEXT NOT NULL DEFAULT '',
   active INTEGER NOT NULL DEFAULT 1,
   created_at TEXT NOT NULL
 );
@@ -71,6 +74,21 @@ CREATE TABLE IF NOT EXISTS payroll_settlements (
   UNIQUE(settlement_month, worker_id),
   FOREIGN KEY(worker_id) REFERENCES workers(id)
 );
+
+CREATE TABLE IF NOT EXISTS site_expenses (
+  id TEXT PRIMARY KEY NOT NULL,
+  site_id TEXT NOT NULL,
+  expense_date TEXT NOT NULL,
+  description TEXT NOT NULL,
+  amount INTEGER NOT NULL CHECK(amount > 0),
+  note TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY(site_id) REFERENCES sites(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_expense_site_date
+  ON site_expenses(site_id, expense_date);
 
 CREATE INDEX IF NOT EXISTS idx_attendance_date_site
   ON attendance_records(work_date, site_id);

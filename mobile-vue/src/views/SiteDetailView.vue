@@ -102,22 +102,32 @@ function closeAssignmentEditor() {
   editingAssignmentId.value = ''
 }
 
-function saveAssignment() {
-  if (!site.value || !assignmentForm.workerId || assignmentForm.dailyRate < 0) return
-  store.upsertSiteWorkerAssignment({
-    siteId: site.value.id,
-    workerId: assignmentForm.workerId,
-    workRole: assignmentForm.workRole,
-    dailyRate: Number(assignmentForm.dailyRate) || 0,
-  })
-  closeAssignmentEditor()
+async function saveAssignment() {
+  if (!site.value || !assignmentForm.workerId || assignmentForm.dailyRate < 0 || store.saving)
+    return
+  try {
+    await store.upsertSiteWorkerAssignment({
+      siteId: site.value.id,
+      workerId: assignmentForm.workerId,
+      workRole: assignmentForm.workRole,
+      dailyRate: Number(assignmentForm.dailyRate) || 0,
+    })
+    closeAssignmentEditor()
+  } catch {
+    return
+  }
 }
 
-function removeAssignment(assignment: SiteWorkerAssignment) {
+async function removeAssignment(assignment: SiteWorkerAssignment) {
+  if (store.saving) return
   const worker = store.workers.find((candidate) => candidate.id === assignment.workerId)
   if (!window.confirm(`${worker?.name ?? '근로자'}의 현장 배정을 해제하시겠습니까?`)) return
-  store.removeSiteWorkerAssignment(assignment.id)
-  if (editingAssignmentId.value === assignment.id) closeAssignmentEditor()
+  try {
+    await store.removeSiteWorkerAssignment(assignment.id)
+    if (editingAssignmentId.value === assignment.id) closeAssignmentEditor()
+  } catch {
+    return
+  }
 }
 </script>
 
@@ -139,27 +149,39 @@ function removeAssignment(assignment: SiteWorkerAssignment) {
 
     <section class="detail-meta" aria-label="현장 기본 정보">
       <dl>
-        <div><dt>발주처</dt><dd>{{ site.client || '-' }}</dd></div>
+        <div>
+          <dt>발주처</dt>
+          <dd>{{ site.client || '-' }}</dd>
+        </div>
         <div>
           <dt>공사 기간</dt>
           <dd>{{ formatDate(site.startDate) }} - {{ formatDate(site.endDate) }}</dd>
         </div>
-        <div><dt>상태</dt><dd>{{ siteStatusLabels[site.status] }}</dd></div>
+        <div>
+          <dt>상태</dt>
+          <dd>{{ siteStatusLabels[site.status] }}</dd>
+        </div>
       </dl>
     </section>
 
     <section class="metric-grid detail-metrics" aria-label="현장 인력 요약">
       <article class="metric-item">
         <span class="metric-icon green"><Users :size="20" /></span>
-        <div><small>현재 배정 인원</small><strong>{{ assignments.length }}</strong></div>
+        <div>
+          <small>현재 배정 인원</small><strong>{{ assignments.length }}</strong>
+        </div>
       </article>
       <article class="metric-item">
         <span class="metric-icon blue"><BriefcaseBusiness :size="20" /></span>
-        <div><small>배정 도장공</small><strong>{{ painterCount }}</strong></div>
+        <div>
+          <small>배정 도장공</small><strong>{{ painterCount }}</strong>
+        </div>
       </article>
       <article class="metric-item">
         <span class="metric-icon amber"><CalendarDays :size="20" /></span>
-        <div><small>누적 작업일</small><strong>{{ totalWorkedDays }}</strong></div>
+        <div>
+          <small>누적 작업일</small><strong>{{ totalWorkedDays }}</strong>
+        </div>
       </article>
       <article class="metric-item">
         <span class="metric-icon red"><ClipboardCheck :size="20" /></span>
@@ -172,7 +194,10 @@ function removeAssignment(assignment: SiteWorkerAssignment) {
 
     <section class="content-section table-section detail-section">
       <div class="section-heading">
-        <div><h2>현장 근로자 배정</h2><p>현장에서 적용할 직책과 일급</p></div>
+        <div>
+          <h2>현장 근로자 배정</h2>
+          <p>현장에서 적용할 직책과 일급</p>
+        </div>
         <button
           class="button button-secondary"
           type="button"
@@ -238,8 +263,12 @@ function removeAssignment(assignment: SiteWorkerAssignment) {
         <table class="data-table management-table">
           <thead>
             <tr>
-              <th>근로자</th><th>현장 직책</th><th>현장 일급</th><th>누적 작업일</th
-              ><th>누적 인건비</th><th></th>
+              <th>근로자</th>
+              <th>현장 직책</th>
+              <th>현장 일급</th>
+              <th>누적 작업일</th>
+              <th>누적 인건비</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
@@ -259,13 +288,17 @@ function removeAssignment(assignment: SiteWorkerAssignment) {
                     type="button"
                     title="배정 수정"
                     @click="openAssignmentEditor(item.assignment)"
-                  ><Pencil :size="16" /></button>
+                  >
+                    <Pencil :size="16" />
+                  </button>
                   <button
                     class="icon-button danger-button"
                     type="button"
                     title="배정 해제"
                     @click="removeAssignment(item.assignment)"
-                  ><Trash2 :size="16" /></button>
+                  >
+                    <Trash2 :size="16" />
+                  </button>
                 </div>
               </td>
             </tr>
@@ -279,21 +312,32 @@ function removeAssignment(assignment: SiteWorkerAssignment) {
 
     <section class="content-section table-section detail-section">
       <div class="section-heading">
-        <div><h2>최근 출석 기록</h2><p>현장에 저장된 작업 이력</p></div>
+        <div>
+          <h2>최근 출석 기록</h2>
+          <p>현장에 저장된 작업 이력</p>
+        </div>
       </div>
       <div v-if="records.length" class="data-table-wrap">
         <table class="data-table">
           <thead>
             <tr>
-              <th>날짜</th><th>근로자</th><th>작업 직책</th><th>상태</th><th>시간</th
-              ><th>적용 일급</th><th>인건비</th>
+              <th>날짜</th>
+              <th>근로자</th>
+              <th>작업 직책</th>
+              <th>상태</th>
+              <th>시간</th>
+              <th>적용 일급</th>
+              <th>인건비</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="record in records.slice(0, 30)" :key="record.id">
               <td>{{ formatDate(record.date) }}</td>
               <td>
-                {{ store.workers.find((worker) => worker.id === record.workerId)?.name || '삭제된 근로자' }}
+                {{
+                  store.workers.find((worker) => worker.id === record.workerId)?.name ||
+                  '삭제된 근로자'
+                }}
               </td>
               <td>{{ workerRoleLabels[record.workRole] }}</td>
               <td>{{ attendanceStatusLabels[record.status] }}</td>

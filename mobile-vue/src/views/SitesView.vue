@@ -7,6 +7,8 @@ import type { NewSite, Site, SiteStatus } from '@/types/erp'
 import { siteStatusLabels } from '@/utils/erpLabels'
 import { formatDate, todayIso } from '@/utils/formatters'
 
+import { syncSiteEndNotifications } from '@/services/siteEndNotificationService'
+
 const store = useErpStore()
 const showForm = ref(false)
 const editingSiteId = ref<string | null>(null)
@@ -52,8 +54,9 @@ function resetForm() {
   showForm.value = false
 }
 
-function submit() {
-  if (!form.name.trim()) return
+async function submit() {
+  if (!form.name.trim() || store.saving) return
+
   const input: NewSite = {
     ...form,
     name: form.name.trim(),
@@ -61,9 +64,46 @@ function submit() {
     address: form.address.trim(),
   }
 
-  if (editingSiteId.value) store.updateSite(editingSiteId.value, input)
-  else store.addSite(input)
+  try {
+    if (editingSiteId.value) {
+      await store.updateSite(editingSiteId.value, input)
+    } else {
+      await store.addSite(input)
+    }
+  } catch {
+    return
+  }
+
   resetForm()
+
+  try {
+    await syncSiteEndNotifications(
+      store.sites,
+      Boolean(input.endDate && input.status === 'active'),
+    )
+  } catch (error) {
+    console.error('현장 종료 알림 설정 실패:', error)
+  }
+}
+
+async function changeSiteStatus(site: Site, event: Event) {
+  const select = event.target as HTMLSelectElement
+
+  try {
+    await store.updateSiteStatus(
+      site.id,
+      select.value as SiteStatus,
+    )
+  } catch {
+    select.value = site.status
+    return
+  }
+
+  try {
+    await syncSiteEndNotifications(store.sites)
+  } catch (error) {
+    console.error('현장 종료 알림 갱신 실패:', error)
+  }
 }
 </script>
 
@@ -144,12 +184,7 @@ function submit() {
               <select
                 class="status-select"
                 :value="site.status"
-                @change="
-                  store.updateSiteStatus(
-                    site.id,
-                    ($event.target as HTMLSelectElement).value as SiteStatus,
-                  )
-                "
+                @change="changeSiteStatus(site, $event)"
               >
                 <option v-for="(label, value) in siteStatusLabels" :key="value" :value="value">
                   {{ label }}

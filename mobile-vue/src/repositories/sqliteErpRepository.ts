@@ -18,6 +18,7 @@ import type {
   WorkerRole,
   PayrollSettlement,
   PayrollSettlementStatus,
+  SiteExpense,
 } from '@/types/erp'
 
 interface SiteRow {
@@ -31,6 +32,17 @@ interface SiteRow {
   created_at: string
 }
 
+interface SiteExpenseRow {
+  id: string
+  site_id: string
+  expense_date: string
+  description: string
+  amount: number
+  note: string
+  created_at: string
+  updated_at: string
+}
+
 interface WorkerRow {
   id: string
   name: string
@@ -38,6 +50,9 @@ interface WorkerRow {
   team: string
   role: WorkerRole
   daily_rate: number
+  bank_name: string
+  account_number: string
+  account_holder: string
   active: number
   created_at: string
 }
@@ -88,8 +103,9 @@ const siteInsert = `
 
 const workerInsert = `
   INSERT INTO workers
-  (id, name, phone, team, role, daily_rate, active, created_at)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  (id, name, phone, team, role, daily_rate, bank_name, account_number,
+   account_holder, active, created_at)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 const attendanceInsert = `
@@ -134,6 +150,22 @@ export class CapacitorSqliteErpRepository implements ErpRepository {
     )
 
     const sites = (siteResult.values ?? []).map((row) => this.toSite(row as SiteRow))
+    const expenseResult = await database.query(
+      'SELECT * FROM site_expenses ORDER BY expense_date DESC, created_at DESC',
+    )
+    const siteExpenses = (expenseResult.values ?? []).map((value) => {
+      const row = value as SiteExpenseRow
+      return {
+        id: row.id,
+        siteId: row.site_id,
+        date: row.expense_date,
+        description: row.description,
+        amount: Number(row.amount),
+        note: row.note,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      }
+    })
     const workers = (workerResult.values ?? []).map((row) => this.toWorker(row as WorkerRow))
     const siteWorkerAssignments = (assignmentResult.values ?? []).map((row) =>
       this.toAssignment(row as SiteWorkerAssignmentRow),
@@ -152,6 +184,7 @@ export class CapacitorSqliteErpRepository implements ErpRepository {
       siteWorkerAssignments,
       attendanceRecords,
       payrollSettlements,
+      siteExpenses,
     }
   }
 
@@ -161,7 +194,8 @@ export class CapacitorSqliteErpRepository implements ErpRepository {
 
     try {
       await database.execute(
-        `DELETE FROM payroll_settlements;
+        `DELETE FROM site_expenses;
+        DELETE FROM payroll_settlements;
         DELETE FROM attendance_records;
         DELETE FROM site_worker_assignments;
         DELETE FROM workers;
@@ -174,6 +208,7 @@ export class CapacitorSqliteErpRepository implements ErpRepository {
       await this.executeSet(database, data.siteWorkerAssignments.map(this.assignmentStatement))
       await this.executeSet(database, data.attendanceRecords.map(this.attendanceStatement))
       await this.executeSet(database, data.payrollSettlements.map(this.payrollSettlementStatement))
+      await this.executeSet(database, data.siteExpenses.map(this.expenseStatement))
       await database.commitTransaction()
     } catch (error) {
       await database.rollbackTransaction().catch(() => undefined)
@@ -201,6 +236,7 @@ export class CapacitorSqliteErpRepository implements ErpRepository {
 
     await connection.execute(PFT_SCHEMA)
     await this.ensureWorkRoleColumn(connection)
+    await this.ensureWorkerBankColumns(connection)
     this.connection = connection
     return connection
   }
@@ -226,6 +262,14 @@ export class CapacitorSqliteErpRepository implements ErpRepository {
     ],
   })
 
+  private readonly expenseStatement = (expense: SiteExpense): capSQLiteSet => ({
+    statement: `INSERT INTO site_expenses
+      (id, site_id, expense_date, description, amount, note, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    values: [expense.id, expense.siteId, expense.date, expense.description,
+      expense.amount, expense.note, expense.createdAt, expense.updatedAt],
+  })
+
   private readonly workerStatement = (worker: Worker): capSQLiteSet => ({
     statement: workerInsert,
     values: [
@@ -235,6 +279,9 @@ export class CapacitorSqliteErpRepository implements ErpRepository {
       worker.team,
       worker.role,
       worker.dailyRate,
+      worker.bankName,
+      worker.accountNumber,
+      worker.accountHolder,
       worker.active ? 1 : 0,
       worker.createdAt,
     ],
@@ -314,6 +361,24 @@ export class CapacitorSqliteErpRepository implements ErpRepository {
     }
   }
 
+  private async ensureWorkerBankColumns(database: SQLiteDBConnection): Promise<void> {
+    const columns = await database.query('PRAGMA table_info(workers)')
+    const columnNames = new Set(
+      (columns.values ?? []).map((column) => (column as { name?: string }).name),
+    )
+    const missingColumns = [
+      ['bank_name', "TEXT NOT NULL DEFAULT ''"],
+      ['account_number', "TEXT NOT NULL DEFAULT ''"],
+      ['account_holder', "TEXT NOT NULL DEFAULT ''"],
+    ] as const
+
+    for (const [name, definition] of missingColumns) {
+      if (!columnNames.has(name)) {
+        await database.execute(`ALTER TABLE workers ADD COLUMN ${name} ${definition}`, false)
+      }
+    }
+  }
+
   private toWorker(row: WorkerRow): Worker {
     return {
       id: row.id,
@@ -322,6 +387,9 @@ export class CapacitorSqliteErpRepository implements ErpRepository {
       team: row.team,
       role: row.role,
       dailyRate: Number(row.daily_rate),
+      bankName: row.bank_name ?? '',
+      accountNumber: row.account_number ?? '',
+      accountHolder: row.account_holder ?? '',
       active: Number(row.active) === 1,
       createdAt: row.created_at,
     }
